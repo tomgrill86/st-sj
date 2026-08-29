@@ -1,0 +1,51 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "display_name": {
+      "type": "string",
+      "description": "Public marketplace handle"
+    },
+    "avatar_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Profile picture URL"
+    },
+    "bio": {
+      "type": "string",
+      "description": "Seller biography / about text"
+    },
+    "location": {
+      "type": "string",
+      "description": "General location, e.g. city, country"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Contact phone (optional)"
+    },
+    "website": {
+      "type": "string",
+      "format": "uri",
+      "description": "Personal or business website"
+    },
+    "verified": {
+      "type": "boolean",
+      "default": false,
+      "description": "Admin-granted verified seller badge"
+    },
+    "seller_since": {
+      "type": "string",
+      "format": "date",
+      "description": "Date the user became a seller"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "suspended"
+      ],
+      "default": "active"
+    }
+  },
+  "required": []
+}

@@ -1,0 +1,67 @@
+{
+  "name": "AuditLog",
+  "type": "object",
+  "properties": {
+    "actor_id": {
+      "type": "string",
+      "description": "User id who performed the action"
+    },
+    "actor_email": {
+      "type": "string",
+      "description": "User email at time of action"
+    },
+    "actor_role": {
+      "type": "string",
+      "description": "User role at time of action"
+    },
+    "action": {
+      "type": "string",
+      "description": "Action verb, e.g. listing.create, listing.update, listing.delete, listing.moderate, profile.update"
+    },
+    "entity_type": {
+      "type": "string",
+      "description": "Entity affected, e.g. Listing, User"
+    },
+    "entity_id": {
+      "type": "string",
+      "description": "Id of the affected record"
+    },
+    "details": {
+      "type": "object",
+      "description": "Structured before/after and context payload"
+    },
+    "ip_address": {
+      "type": "string"
+    },
+    "user_agent": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "actor_id",
+    "action",
+    "entity_type"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

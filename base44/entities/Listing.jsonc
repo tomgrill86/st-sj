@@ -1,0 +1,144 @@
+{
+  "name": "Listing",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Listing title",
+      "minLength": 3,
+      "maxLength": 140
+    },
+    "description": {
+      "type": "string",
+      "description": "Full description of the good or service"
+    },
+    "listing_type": {
+      "type": "string",
+      "enum": [
+        "good",
+        "service"
+      ],
+      "default": "good"
+    },
+    "price": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Asking price in the listed currency"
+    },
+    "currency": {
+      "type": "string",
+      "default": "USD",
+      "description": "ISO 4217 currency code"
+    },
+    "category_id": {
+      "type": "string",
+      "description": "Reference to a Category record (optional)"
+    },
+    "category": {
+      "type": "string",
+      "description": "Free-text category label for flexible taxonomy"
+    },
+    "condition": {
+      "type": "string",
+      "enum": [
+        "new",
+        "like_new",
+        "used",
+        "refurbished",
+        "not_applicable"
+      ],
+      "default": "not_applicable"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "published",
+        "sold",
+        "closed",
+        "removed"
+      ],
+      "default": "draft"
+    },
+    "location": {
+      "type": "string",
+      "description": "Where the good/service is offered"
+    },
+    "images": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri"
+      },
+      "description": "Ordered list of image URLs"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Searchable tags"
+    },
+    "attributes": {
+      "type": "object",
+      "description": "Flexible key-value attributes for future structured data (specs, shipping, crypto payment options, etc.)"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Internal metadata (view count, flags, source) not shown to users"
+    },
+    "seller_id": {
+      "type": "string",
+      "description": "Denormalized owner user id for fast seller queries"
+    }
+  },
+  "required": [
+    "title",
+    "listing_type",
+    "status"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.status": "published"
+        },
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "created_by_id": "{{user.id}}"
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
