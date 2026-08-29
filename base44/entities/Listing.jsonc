@@ -36,7 +36,11 @@
     },
     "category": {
       "type": "string",
-      "description": "Free-text category label for flexible taxonomy"
+      "description": "Primary category label (denormalized for browse/search)"
+    },
+    "subcategory": {
+      "type": "string",
+      "description": "Subcategory label (denormalized for browse/search)"
     },
     "condition": {
       "type": "string",
@@ -58,7 +62,8 @@
         "closed",
         "removed"
       ],
-      "default": "draft"
+      "default": "draft",
+      "description": "draft = unpublished; published = active/public; sold = completed; closed = ended by seller; removed = admin-removed"
     },
     "location": {
       "type": "string",
@@ -70,7 +75,7 @@
         "type": "string",
         "format": "uri"
       },
-      "description": "Ordered list of image URLs"
+      "description": "Ordered list of public image URLs (first image is the cover)"
     },
     "tags": {
       "type": "array",
@@ -85,11 +90,28 @@
     },
     "metadata": {
       "type": "object",
-      "description": "Internal metadata (view count, flags, source) not shown to users"
+      "description": "Internal metadata (moderation flags, source, AI hints) not shown to users"
     },
     "seller_id": {
       "type": "string",
       "description": "Denormalized owner user id for fast seller queries"
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the listing was last published (set when moving to published)"
+    },
+    "view_count": {
+      "type": "number",
+      "minimum": 0,
+      "default": 0,
+      "description": "Number of times the listing detail page has been viewed"
+    },
+    "favorite_count": {
+      "type": "number",
+      "minimum": 0,
+      "default": 0,
+      "description": "Denormalized count of favorites for fast display"
     }
   },
   "required": [
