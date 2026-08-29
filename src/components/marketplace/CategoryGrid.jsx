@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import { Image } from '@/components/ui/image';
 
 // Renders categories from the Category entity. Shows a graceful empty state
 // when no categories have been seeded yet (seeding happens on the main branch).

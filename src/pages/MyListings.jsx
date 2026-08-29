@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/AuthContext';
 import ListingCard from '@/components/marketplace/ListingCard';
 import EmptyState from '@/components/marketplace/EmptyState';
 import { Button } from '@/components/ui/button';
-import { STATUS_LABELS, STATUS_STYLES, formatPrice } from '@/lib/marketplace';
+import { STATUS_LABELS, STATUS_STYLES } from '@/lib/marketplace';
 
 export default function MyListings() {
   const { user } = useAuth();
