@@ -4,7 +4,12 @@
   "properties": {
     "display_name": {
       "type": "string",
-      "description": "Public marketplace handle"
+      "description": "Public marketplace handle (legacy display name)"
+    },
+    "username": {
+      "type": "string",
+      "description": "Unique public marketplace handle, e.g. @vendra_user",
+      "pattern": "^[a-zA-Z0-9_]{3,30}$"
     },
     "avatar_url": {
       "type": "string",
@@ -15,9 +20,22 @@
       "type": "string",
       "description": "Seller biography / about text"
     },
+    "country": {
+      "type": "string",
+      "description": "ISO country code or country name"
+    },
+    "city_or_region": {
+      "type": "string",
+      "description": "City or region within the country"
+    },
     "location": {
       "type": "string",
-      "description": "General location, e.g. city, country"
+      "description": "General location string (legacy free-text)"
+    },
+    "preferred_currency": {
+      "type": "string",
+      "default": "USD",
+      "description": "ISO 4217 currency code the user prefers to transact in"
     },
     "phone": {
       "type": "string",
@@ -44,7 +62,34 @@
         "active",
         "suspended"
       ],
-      "default": "active"
+      "default": "active",
+      "description": "Account status (active / suspended). Admin-managed."
+    },
+    "seller_rating": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 5,
+      "default": 0,
+      "description": "Aggregate seller rating (0-5). Managed server-side only."
+    },
+    "buyer_rating": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 5,
+      "default": 0,
+      "description": "Aggregate buyer rating (0-5). Managed server-side only."
+    },
+    "completed_sales_count": {
+      "type": "number",
+      "minimum": 0,
+      "default": 0,
+      "description": "Number of completed sales. Managed server-side only."
+    },
+    "completed_purchases_count": {
+      "type": "number",
+      "minimum": 0,
+      "default": 0,
+      "description": "Number of completed purchases. Managed server-side only."
     }
   },
   "required": []
