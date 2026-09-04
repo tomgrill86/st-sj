@@ -1,11 +1,14 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Plus, Heart, LayoutGrid, User as UserIcon, Shield, Menu, X } from 'lucide-react';
+import { Search, Plus, Heart, LayoutGrid, User as UserIcon, Shield, Menu, X, MessageCircle } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ThemeToggle from './ThemeToggle';
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 import { userDisplayName } from '@/lib/marketplace';
+import { totalUnread } from '@/lib/messaging';
 
 export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -19,6 +22,13 @@ export default function Navbar() {
     setMenuOpen(false);
   };
 
+  const { data: conversations = [] } = useQuery({
+    queryKey: ['nav-conversations'],
+    queryFn: () => base44.entities.Conversation.list('-last_message_at', 50),
+    enabled: isAuthenticated,
+    staleTime: 20000,
+  });
+  const unread = totalUnread(conversations, user?.id);
   const isAdmin = user?.role === 'admin';
 
   return (
@@ -46,6 +56,15 @@ export default function Navbar() {
           {isAuthenticated && (
             <Button asChild variant="ghost" size="sm" className="hidden sm:flex">
               <Link to="/favorites"><Heart className="mr-2 h-4 w-4" />Saved</Link>
+            </Button>
+          )}
+
+          {isAuthenticated && (
+            <Button asChild variant="ghost" size="sm" className="relative hidden sm:flex">
+              <Link to="/messages">
+                <MessageCircle className="mr-2 h-4 w-4" />Messages
+                {unread > 0 && <span className="ml-1.5 rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground">{unread}</span>}
+              </Link>
             </Button>
           )}
 
@@ -106,6 +125,12 @@ export default function Navbar() {
               <Link to="/browse" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted"><LayoutGrid className="h-4 w-4" />Browse</Link>
               {isAuthenticated && (
                 <Link to="/favorites" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted"><Heart className="h-4 w-4" />Saved</Link>
+              )}
+              {isAuthenticated && (
+                <Link to="/messages" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted">
+                  <MessageCircle className="h-4 w-4" />Messages
+                  {unread > 0 && <span className="ml-auto rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground">{unread}</span>}
+                </Link>
               )}
               {isAuthenticated && (
                 <Link to="/sell" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-muted"><Plus className="h-4 w-4" />Sell something</Link>

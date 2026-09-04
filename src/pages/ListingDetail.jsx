@@ -9,6 +9,8 @@ import StarRating from '@/components/marketplace/StarRating';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { formatPrice, CONDITION_LABELS, formatDate, userDisplayName, userHandle, userLocation } from '@/lib/marketplace';
+import { getOrCreateConversation } from '@/lib/messaging';
+import { toast } from '@/components/ui/use-toast';
 
 export default function ListingDetail() {
   const { id } = useParams();
@@ -44,6 +46,7 @@ export default function ListingDetail() {
     enabled: isAuthenticated,
   });
   const [favBusy, setFavBusy] = useState(false);
+  const [msgBusy, setMsgBusy] = useState(false);
 
   const toggleFavorite = async () => {
     if (!isAuthenticated) { navigate('/login'); return; }
@@ -65,6 +68,20 @@ export default function ListingDetail() {
       qc.invalidateQueries({ queryKey: ['favorites'] });
     } finally {
       setFavBusy(false);
+    }
+  };
+
+  const contactSeller = async () => {
+    if (!isAuthenticated) { navigate('/login'); return; }
+    if (!sellerId || isOwner) return;
+    setMsgBusy(true);
+    try {
+      const conv = await getOrCreateConversation({ listing, user, sellerId });
+      navigate(`/messages?c=${conv.id}`);
+    } catch (e) {
+      toast({ title: 'Could not start conversation', description: e?.message || 'Please try again.', variant: 'destructive' });
+    } finally {
+      setMsgBusy(false);
     }
   };
 
@@ -123,8 +140,8 @@ export default function ListingDetail() {
             <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90" disabled title="Payments coming soon">
               <ShoppingBag className="mr-2 h-5 w-5" /> Buy
             </Button>
-            <Button size="lg" variant="outline" disabled title="Messaging coming soon">
-              <MessageCircle className="mr-2 h-5 w-5" /> Contact seller
+            <Button size="lg" variant="outline" onClick={contactSeller} disabled={msgBusy || isOwner} title={isOwner ? 'This is your listing' : 'Message the seller'}>
+              <MessageCircle className="mr-2 h-5 w-5" /> {msgBusy ? 'Opening…' : 'Contact seller'}
             </Button>
             {isAuthenticated && (
               <Button size="lg" variant="ghost" onClick={toggleFavorite} disabled={favBusy}>
@@ -133,7 +150,7 @@ export default function ListingDetail() {
               </Button>
             )}
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">Buying and messaging will be available in a later phase.</p>
+          <p className="mt-3 text-xs text-muted-foreground">Buying will be available in a later phase.</p>
 
           {/* Description */}
           <div className="mt-8 border-t border-border pt-6">

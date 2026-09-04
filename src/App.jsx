@@ -16,6 +16,7 @@ import Sell from '@/pages/Sell';
 import MyListings from '@/pages/MyListings';
 import Profile from '@/pages/Profile';
 import Favorites from '@/pages/Favorites';
+import Messages from '@/pages/Messages';
 import Admin from '@/pages/Admin';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
@@ -66,6 +67,7 @@ const AuthenticatedApp = () => {
           <Route path="/my-listings" element={<MyListings />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/favorites" element={<Favorites />} />
+          <Route path="/messages" element={<Messages />} />
           <Route path="/admin" element={<Admin />} />
         </Route>
       </Route>

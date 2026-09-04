@@ -1,0 +1,103 @@
+{
+  "name": "Conversation",
+  "type": "object",
+  "properties": {
+    "participant_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "User ids of all participants in the conversation"
+    },
+    "listing_id": {
+      "type": "string",
+      "description": "Listing this conversation is about (optional)"
+    },
+    "listing_title": {
+      "type": "string",
+      "description": "Denormalized listing title for display"
+    },
+    "listing_image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Denormalized cover image of the listing"
+    },
+    "last_message_preview": {
+      "type": "string",
+      "description": "Preview text of the most recent message"
+    },
+    "last_message_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the most recent message (for sorting)"
+    },
+    "last_sender_id": {
+      "type": "string",
+      "description": "User id of the last sender"
+    },
+    "unread_counts": {
+      "type": "object",
+      "description": "Map of participant user id -> unread message count"
+    }
+  },
+  "required": [
+    "participant_ids"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "data.participant_ids": {
+            "$in": [
+              "{{user.id}}"
+            ]
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "create": {
+      "data.participant_ids": {
+        "$in": [
+          "{{user.id}}"
+        ]
+      }
+    },
+    "update": {
+      "$or": [
+        {
+          "data.participant_ids": {
+            "$in": [
+              "{{user.id}}"
+            ]
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "data.participant_ids": {
+            "$in": [
+              "{{user.id}}"
+            ]
+          }
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
