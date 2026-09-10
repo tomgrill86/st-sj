@@ -1,0 +1,68 @@
+{
+  "name": "Review",
+  "type": "object",
+  "properties": {
+    "seller_id": {
+      "type": "string",
+      "description": "User being reviewed"
+    },
+    "reviewer_id": {
+      "type": "string",
+      "description": "User leaving the review (the buyer)"
+    },
+    "listing_id": {
+      "type": "string",
+      "description": "Listing this review relates to (optional)"
+    },
+    "listing_title": {
+      "type": "string",
+      "description": "Denormalized listing title for context"
+    },
+    "rating": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Star rating from 1 to 5"
+    },
+    "body": {
+      "type": "string",
+      "description": "Review comment text",
+      "maxLength": 2000
+    }
+  },
+  "required": [
+    "seller_id",
+    "reviewer_id",
+    "rating"
+  ],
+  "rls": {
+    "read": {},
+    "create": {
+      "data.reviewer_id": "{{user.id}}"
+    },
+    "update": {
+      "$or": [
+        {
+          "data.reviewer_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "data.reviewer_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
