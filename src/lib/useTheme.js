@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 
-const STORAGE_KEY = 'vendra-theme';
+const STORAGE_KEY = 'staesj-theme';
 
 function getInitial() {
-  if (typeof window === 'undefined') return 'light';
+  if (typeof window === 'undefined') return 'dark';
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored === 'light' || stored === 'dark') return stored;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  // Dark is the default and primary STÆSJ experience.
+  return 'dark';
 }
 
 function apply(theme) {

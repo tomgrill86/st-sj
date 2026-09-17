@@ -2,7 +2,7 @@ import { Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 
-export default function SearchBar({ defaultValue = '', large = false, className = '' }) {
+export default function SearchBar({ defaultValue = '', large = false, placeholder = 'Finn stæsj...', className = '' }) {
   const [q, setQ] = useState(defaultValue);
   const navigate = useNavigate();
 
@@ -18,19 +18,19 @@ export default function SearchBar({ defaultValue = '', large = false, className 
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="What are you looking for?"
+          placeholder={placeholder}
           className={
             large
-              ? 'h-16 w-full rounded-full border border-border bg-card pl-14 pr-32 text-lg shadow-sm outline-none transition focus:border-ring focus:ring-4 focus:ring-ring/15'
+              ? 'h-14 w-full rounded-full border border-border bg-card pl-12 pr-28 text-base outline-none transition focus:border-ring focus:ring-4 focus:ring-ring/15 sm:h-16 sm:text-lg'
               : 'h-12 w-full rounded-full border border-border bg-card pl-12 pr-4 text-sm outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20'
           }
         />
         {large && (
           <button
             type="submit"
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition hover:opacity-90"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 sm:px-6"
           >
-            Search
+            Søk
           </button>
         )}
       </div>

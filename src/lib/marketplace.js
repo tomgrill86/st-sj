@@ -1,21 +1,21 @@
 import { base44 } from '@/api/base44Client';
 
-// Condition labels and styles
+// Condition labels (Norwegian)
 export const CONDITION_LABELS = {
-  new: 'New',
-  like_new: 'Like New',
-  used: 'Used',
-  refurbished: 'Refurbished',
-  not_applicable: 'N/A',
+  new: 'Ny',
+  like_new: 'Som ny',
+  used: 'Brukt',
+  refurbished: 'Renovert',
+  not_applicable: '',
 };
 
-// Listing status labels (maps the stored enum to marketplace-facing terms)
+// Listing status labels (Norwegian)
 export const STATUS_LABELS = {
-  draft: 'Draft',
-  published: 'Active',
-  sold: 'Sold',
-  closed: 'Closed',
-  removed: 'Removed',
+  draft: 'Utkast',
+  published: 'Aktiv',
+  sold: 'Solgt',
+  closed: 'Lukket',
+  removed: 'Fjernet',
 };
 
 // Maps stored status -> marketplace-facing "public" status for display
@@ -36,9 +36,9 @@ export const STATUS_STYLES = {
 };
 
 export const SORT_OPTIONS = [
-  { value: 'newest', label: 'Newest' },
-  { value: 'price_asc', label: 'Price: Low to High' },
-  { value: 'price_desc', label: 'Price: High to Low' },
+  { value: 'newest', label: 'Nyeste' },
+  { value: 'price_asc', label: 'Pris: Lav til høy' },
+  { value: 'price_desc', label: 'Pris: Høy til lav' },
 ];
 
 // Currency formatting (locale-aware, graceful fallback)
@@ -54,6 +54,9 @@ const CURRENCY_LOCALE = {
   ZAR: 'en-ZA',
   NGN: 'en-NG',
   AED: 'ar-AE',
+  NOK: 'nb-NO',
+  SEK: 'sv-SE',
+  DKK: 'da-DK',
 };
 
 export function formatPrice(amount, currency = 'USD') {
@@ -70,25 +73,26 @@ export function formatPrice(amount, currency = 'USD') {
   }
 }
 
+// Norwegian relative time
 export function timeAgo(dateString) {
   if (!dateString) return '';
   const date = new Date(dateString);
   const diff = Date.now() - date.getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return 'nå';
+  if (mins < 60) return `${mins} min`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return `${hrs} t`;
   const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days}d ago`;
+  if (days < 30) return `${days} d`;
   const months = Math.floor(days / 30);
-  if (months < 12) return `${months}mo ago`;
-  return `${Math.floor(months / 12)}y ago`;
+  if (months < 12) return `${months} mnd`;
+  return `${Math.floor(months / 12)} år`;
 }
 
 export function formatDate(dateString) {
   if (!dateString) return '';
-  return new Date(dateString).toLocaleDateString(undefined, {
+  return new Date(dateString).toLocaleDateString('nb-NO', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -123,7 +127,7 @@ export function publicUserFields(user) {
 }
 
 export function userDisplayName(user) {
-  return user?.full_name || user?.username || user?.display_name || user?.email?.split('@')[0] || 'VENDRA member';
+  return user?.full_name || user?.username || user?.display_name || user?.email?.split('@')[0] || 'STÆSJ-medlem';
 }
 
 export function userHandle(user) {
