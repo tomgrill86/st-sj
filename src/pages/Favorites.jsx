@@ -39,7 +39,7 @@ export default function Favorites() {
                 {fav.listing_image ? (
                   <Image src={fav.listing_image} alt={fav.listing_title} fittingType="fill" className="h-full w-full object-cover transition group-hover:scale-[1.03]" />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-muted-foreground/30"><span className="font-display text-3xl">V</span></div>
+                  <div className="flex h-full w-full items-center justify-center text-muted-foreground/30"><span className="font-display text-3xl font-bold">S</span></div>
                 )}
                 {fav.listing_status && fav.listing_status !== 'published' && (
                   <span className="absolute left-3 top-3 rounded-full bg-background/90 px-2.5 py-1 text-xs font-medium capitalize">{fav.listing_status}</span>

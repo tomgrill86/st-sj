@@ -99,7 +99,7 @@ export default function MyListings() {
           {other.length > 0 && <Section title="Closed / Removed" items={other} emptyText="" />}
         </>
       ) : (
-        <EmptyState icon={Package} title="You haven't listed anything yet" description="Create your first listing and start selling on VENDRA." actionLabel="Sell something" actionTo="/sell" />
+        <EmptyState icon={Package} title="You haven't listed anything yet" description="Lag din første annonse og begynn å selge på STÆSJ." actionLabel="Sell something" actionTo="/sell" />
       )}
     </div>
   );

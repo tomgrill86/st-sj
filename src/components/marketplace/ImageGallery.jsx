@@ -7,7 +7,7 @@ export default function ImageGallery({ images = [], title = '' }) {
   if (!images.length) {
     return (
       <div className="flex aspect-square items-center justify-center rounded-2xl border border-border bg-muted">
-        <span className="font-display text-5xl text-muted-foreground/30">V</span>
+        <span className="font-display text-5xl font-bold text-muted-foreground/30">S</span>
       </div>
     );
   }
