@@ -15,11 +15,24 @@
 //     - protokollversjon ("stæsj:e2ee:v1")
 //     - formål ("message-key")
 //     - conversationId
-//     - BEGGE offentlige nøkler (sortert base64) — hindrer at samme ECDH-
-//       utbytte gjenbrukes på tvers av identiteter/rotasjoner
-//     - BEGGE bruker-ID-er (sortert) — binder nøkkelen til deltakerne
-//   Kanonisk sortering (lo/hi etter base64) garanterer at begge parter avleder
-//   identisk info uavhengig av hvem som initierer.
+//     - BEGGE (userId, publicKey)-par, ROLLEMERKET — ikke separat sorterte
+//       lister. Hvert par kodes som "<userId>\x1E<publicKey>" og parene
+//       sorteres kanonisk (lo/hi) etter base64-koding. Dette binder HVER
+//       public key til EN bestemt user-ID, slik at en angriper ikke kan
+//       "låne" noens public key og binde den til en annen user-ID.
+//   Kanonisk sortering av parene garanterer at begge parter avleder identisk
+//   info uavhengig av hvem som initierer.
+//
+// ⚠️ VIKTIG BEGRENSNING (dokumentert):
+//   Denne bindingen autentiserer IKKE public keys. Den hindrer kun at samme
+//   ECDH-utbytte gjenbrukes på tvers av (userId, publicKey)-koblinger i denne
+//   samtalen. Det finnes INGEN mekanisme for å verifisere at en oppgitt
+//   public key faktisk tilhører den påståtte brukeren (ingen key-change-
+//   varsling, ingen trust-on-first-use-bekreftelse, ingen fingerprint-
+//   verifisering). Fase 2+ MÅ spesifisere nøkkelautentisering (key-change-
+//   varsling + out-of-band identitetsverifisering) FØR modulen kobles til
+//   produksjonsmeldinger. Frem til det er en mottaker sårbart for
+//   key-substitution-angrep dersom en angriper kontrollerer nøkkel-distribusjon.
 //
 // Arkitektonisk forberedelse for rotasjon:
 //   `deriveMessageKey(sessionState)` returnerer i MVP den statiske
@@ -112,19 +125,21 @@ export async function deriveConversationKey(sharedSecret, ctx) {
 // slik at Alice→Bob og Bob→Alice produserer identisk info → identisk nøkkel.
 // ---------------------------------------------------------------------------
 
+// Hvert par kodes som "<userId><RS><publicKeyBase64>" der RS = ASCII 0x1E
+// (Record Separator). Parene sorteres kanonisk etter hele strengen (lo/hi).
+// Dette binder HVER public key til EN bestemt user-ID — ikke to separat
+// sorterte lister — slik at nøkkel og identitet ikke kan "byttes om" uavhengig.
 export function buildHKDFInfo({ conversationId, myPublicKey, theirPublicKey, myUserId, theirUserId }) {
-  const pubLo = publicKeyToBase64(myPublicKey) < publicKeyToBase64(theirPublicKey)
-    ? myPublicKey : theirPublicKey;
-  const pubHi = pubLo === myPublicKey ? theirPublicKey : myPublicKey;
-  const [userLo, userHi] = [myUserId, theirUserId].sort();
+  const RS = '\x1E'; // ASCII Record Separator — skiller userId fra publicKey
+  const myPair = `${myUserId}${RS}${publicKeyToBase64(myPublicKey)}`;
+  const theirPair = `${theirUserId}${RS}${publicKeyToBase64(theirPublicKey)}`;
+  const [pairLo, pairHi] = myPair < theirPair ? [myPair, theirPair] : [theirPair, myPair];
   const parts = [
     PROTOCOL_VERSION,
     HKDF_PURPOSE,
     conversationId,
-    publicKeyToBase64(pubLo),
-    publicKeyToBase64(pubHi),
-    userLo,
-    userHi,
+    pairLo,
+    pairHi,
   ];
   return textEncoder.encode(parts.join('\x1F'));
 }

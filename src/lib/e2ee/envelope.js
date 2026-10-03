@@ -12,14 +12,17 @@
 //   Tidligere: `${conversation_id}||${sender_id}||${message_id}||${sequence_number}`
 //   (sårbar for kollisjon dersom et felt inneholdt "|").
 //
-//   Nå: et versjonert, lengde-prefiksert format. Hvert felt kodes som
-//   `<varint-lengde>:<utf8-verdi>` der lengden er feltets byte-lengde som
-//   desimal-streng, etterfulgt av ':' og verdi-byte. Feltene skilles med
-//   ASCII 0x1F (Unit Separator). En 1-byte versjonstegn-prefiks ("v1\x1F")
-//   gjør formatet fremtidig-kompatibelt.
+//   Nå: et versjonert, lengde-prefiksert format med EKSPLSITT felt-tagging.
+//   Hvert felt kodes som `<tag>="len:<utf8-verdi>"` der:
+//     - tag er en kort ASCII-nøkkel ("cid", "snd", "mid", "seq")
+//     - len er feltets UTF-8 BYTE-lengde som desimal-streng (ikke tegnlengde)
+//     - verdi er den rå UTF-8-strengen
+//   Feltene skilles med ASCII 0x1F (Unit Separator). En versjonsprefiks
+//   ("v1\x1F") gjør formatet fremtidig-kompatibelt.
 //
-//   Dette er kollisjonsfritt: lengde-prefiksen gjør at verdi-med-skilletegn
-//   aldri kan tolkes som to felt. (Se test av entydig koding.)
+//   Taggene gjør AAD selv-beskrivende og robust mot felt-omorganisering;
+//   lengde-prefiksen (UTF-8 bytelengde) gjør at verdi-med-skilletegn aldri kan
+//   tolkes som to felt — kollisjonsfritt. (Se test av entydig koding.)
 //
 // AES-GCM autentiserer AAD. Dette betyr:
 //   - Endres message_id i AAD → tag mismatch → avvis.
@@ -52,17 +55,17 @@ const textEncoder = new TextEncoder();
 export function buildAAD({ conversation_id, sender_id, message_id, sequence_number }) {
   const seqStr = String(sequence_number);
   const fields = [
-    field(conversation_id),
-    field(sender_id),
-    field(message_id),
-    field(seqStr),
+    taggedField('cid', conversation_id),
+    taggedField('snd', sender_id),
+    taggedField('mid', message_id),
+    taggedField('seq', seqStr),
   ];
   return AAD_VERSION + SEP + fields.join(SEP);
 }
 
-function field(value) {
-  const byteLen = textEncoder.encode(value).length;
-  return `${byteLen}:${value}`;
+function taggedField(tag, value) {
+  const byteLen = textEncoder.encode(value).length; // UTF-8 byte-lengde
+  return `${tag}=${byteLen}:${value}`;
 }
 
 // ---------------------------------------------------------------------------

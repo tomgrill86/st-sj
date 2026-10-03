@@ -23,6 +23,29 @@
 //   (`globalThis.crypto.getRandomValues`). Test-seam for IV-kollisjon bor i
 //   test-filen (se e2ee.test.js), ikke her — og tree-shakes dermed ut av
 //   produksjonsbygget.
+//
+// BRUKS- OG ROTASJONSGRENSE FOR AES-GCM (NIST SP 800-38D):
+//   NIST krever IV-unikhet PER NØKKEL. Ved tilfeldig genererte 96-bit IV-er
+//   er den samlete krypteringsgrensen 2^32 kall under samme nøkkel — over
+//   denne grensen blir sannsynligheten for IV-kollisjon (og dermed
+//   konfidensialitetsbrudd) ikke-negligibel (birthday bound ~2^48 for
+//   full tag-reuse-sikkerhet, men NIST setter den praktiske grensen til 2^32
+//   for tilfeldig IV-generering).
+//
+//   STÆSJ MVP bruker EN stabil samtalenøkkel per samtale (se session.js).
+//   Det betyr at 2^32 meldinger per samtale er den teoretiske grensen før
+//   nøkkelrotasjon PÅKREVES. For en meldingsapp er dette rikkelig for
+//   MVP-bruk, MEN:
+//
+//   - Det finnes foreløpig INGEN automatisk nøkkelrotasjon i MVP (se
+//     session.js `canRotate` → false). Fase 5 (Double Ratchet) vil rotere
+//     per-meldings nøkler.
+//   - Inntil rotasjon er implementert, BØR samtaler som nærmer seg
+//     2^32 meldinger (ekstremt sjelden for MVP) lukkes og gjenopprettes med
+//     ny ECDH for å få en ny nøkkel.
+//   - Denne grensen gjelder PER NØKKEL, ikke per sesjon — flere samtaler
+//     med samme deltakere bruker forskjellige nøkler ( forskjellig
+//     conversationId i HKDF-info) og har dermed hver sine 2^32.
 
 const IV_BYTES = 12; // AES-GCM anbefaler 96-bit IV
 const KEY_BYTES = 32; // AES-256

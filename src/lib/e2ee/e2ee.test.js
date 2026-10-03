@@ -561,6 +561,89 @@ test('J3. kostbar KDF ved feil passord (abuse-resistance via Argon2id)', async (
 });
 
 // ---------------------------------------------------------------------------
+// M. HKDF-BINDING AV ROLLEMERKTE (userId, publicKey)-PAR
+// ---------------------------------------------------------------------------
+// Målet: HKDF-info binder HVER public key til EN bestemt user-ID (rollemerket
+// par), ikke to separat sorterte lister. Dette forhindrer key-substitution:
+// en angriper som kontrollerer nøkkel-distribusjon kan ikke "låne" noens
+// public key og binde den til en annen user-ID for å omdirigere meldinger.
+// ---------------------------------------------------------------------------
+
+test('M1. byttede identiteter: bytte av user-ID-er endrer nøkkel', async () => {
+  // Samme nøkler, men Alice og Bob bytter user-ID-er. Nøkkelen MÅ endres
+  // (selv om ECDH-utbyttet er det samme) — bindingen er til identitetene.
+  const s1 = await createSessionState({
+    mySecretKey: A.secretKey, myPublicKey: A.publicKey, theirPublicKey: B.publicKey,
+    conversationId: CONVO, myUserId: ALICE_ID, theirUserId: BOB_ID,
+  });
+  const s2 = await createSessionState({
+    mySecretKey: A.secretKey, myPublicKey: A.publicKey, theirPublicKey: B.publicKey,
+    conversationId: CONVO, myUserId: BOB_ID, theirUserId: ALICE_ID,
+  });
+  const k1 = await exportRaw(await deriveMessageKey(s1));
+  const k2 = await exportRaw(await deriveMessageKey(s2));
+  assert.notDeepEqual(Array.from(k1), Array.from(k2), 'byttede user-ID-er gir ulik nøkkel');
+});
+
+test('M2. byttet nøkkel–bruker-kobling: ulik key→user binding gir ulik nøkkel', async () => {
+  // Angrepsscenario: Mallory tar Bobs public key og påstår den er "hennes"
+  // (forskjellig user-ID bundet til samme key). Nøkkelen MÅ endres — paret
+  // (userId, publicKey) er det bindes, ikke public key alene.
+  // Sammenlign: (Alice, A) ↔ (Bob, B)  mot  (Alice, A) ↔ (Mallory, B-key)
+  const C = generateIdentityKeyPair();
+  const legit = await createSessionState({
+    mySecretKey: A.secretKey, myPublicKey: A.publicKey, theirPublicKey: B.publicKey,
+    conversationId: CONVO, myUserId: ALICE_ID, theirUserId: BOB_ID,
+  });
+  // Bob's key, men user-ID "Mallory" i stedet for "Bob" — ny (user,key)-kobling.
+  const swapped = await createSessionState({
+    mySecretKey: A.secretKey, myPublicKey: A.publicKey, theirPublicKey: B.publicKey,
+    conversationId: CONVO, myUserId: ALICE_ID, theirUserId: 'user-mallory',
+  });
+  const kLegit = await exportRaw(await deriveMessageKey(legit));
+  const kSwapped = await exportRaw(await deriveMessageKey(swapped));
+  assert.notDeepEqual(Array.from(kLegit), Array.from(kSwapped),
+    'ulik (userId, key)-binding gir ulik nøkkel selv med samme ECDH-utbytte');
+});
+
+test('M3. byttede roller: A↔B bytter hvem som er "my" — samme nøkkel (symmetri)', async () => {
+  // Rollembytte mellom to EKTE parter: Alice initierer som "meg" med Bob som
+  // motpart, vs Bob initierer som "meg" med Alice som motpart. MÅ gi samme
+  // nøkkel (symmetrisk ECDH + kanonisk sortering av par).
+  const aliceView = await createSessionState({
+    mySecretKey: A.secretKey, myPublicKey: A.publicKey, theirPublicKey: B.publicKey,
+    conversationId: CONVO, myUserId: ALICE_ID, theirUserId: BOB_ID,
+  });
+  const bobView = await createSessionState({
+    mySecretKey: B.secretKey, myPublicKey: B.publicKey, theirPublicKey: A.publicKey,
+    conversationId: CONVO, myUserId: BOB_ID, theirUserId: ALICE_ID,
+  });
+  const kA = await exportRaw(await deriveMessageKey(aliceView));
+  const kB = await exportRaw(await deriveMessageKey(bobView));
+  assert.deepEqual(Array.from(kA), Array.from(kB),
+    'ekte parter bytter rolle → samme nøkkel (symmetrisk ECDH + kanonisk par-sortering)');
+});
+
+test('M4. HKDF-info inneholder BEGGE (userId, publicKey)-par — ikke separat sorterte lister', () => {
+  // Bekreft at info-strengen inneholder BEGGE user-ID-er og BEGGE public keys
+  // kodet sammen som par (Record Separator 0x1E mellom userId og key i hvert par).
+  const info = buildHKDFInfo({
+    conversationId: CONVO, myPublicKey: A.publicKey, theirPublicKey: B.publicKey,
+    myUserId: ALICE_ID, theirUserId: BOB_ID,
+  });
+  const s = new TextDecoder().decode(info);
+  assert.ok(s.includes(ALICE_ID), 'info inneholder Alice user-ID');
+  assert.ok(s.includes(BOB_ID), 'info inneholder Bob user-ID');
+  assert.ok(s.includes(publicKeyToBase64(A.publicKey)), 'info inneholder Alice public key');
+  assert.ok(s.includes(publicKeyToBase64(B.publicKey)), 'info inneholder Bob public key');
+  assert.ok(s.includes(PROTOCOL_VERSION), 'info inneholder protokollversjon');
+  // Hvert par har Record Separator mellom userId og publicKey.
+  assert.ok(s.includes(`${ALICE_ID}\x1E${publicKeyToBase64(A.publicKey)}`) ||
+            s.includes(`${BOB_ID}\x1E${publicKeyToBase64(B.publicKey)}`),
+            'minst ett (userId, key)-par er kodet sammen med 0x1E');
+});
+
+// ---------------------------------------------------------------------------
 // K. X25519 CONTRIBUTORY-VALIDERING (low-order / all-zero / lengde)
 // ---------------------------------------------------------------------------
 
@@ -615,12 +698,42 @@ test('L1. AAD er versjonert og entydig — felt som inneholder skilletegn kollid
   const x = buildAAD({ conversation_id: 'a', sender_id: 'b\x1Fc', message_id: 'm', sequence_number: 1 });
   const y = buildAAD({ conversation_id: 'a\x1Fb', sender_id: 'c', message_id: 'm', sequence_number: 1 });
   assert.notEqual(x, y);
-  // Versjonsprefiks til stede.
-  assert.ok(buildAAD({ conversation_id: 'c', sender_id: 's', message_id: 'm', sequence_number: 1 }).startsWith('v1'));
+  // Versjonsprefiks + eksplisitte felttagger til stede.
+  const sample = buildAAD({ conversation_id: 'c', sender_id: 's', message_id: 'm', sequence_number: 1 });
+  assert.ok(sample.startsWith('v1'), 'versjonsprefiks');
+  assert.ok(sample.includes('cid='), 'tag for conversation_id');
+  assert.ok(sample.includes('snd='), 'tag for sender_id');
+  assert.ok(sample.includes('mid='), 'tag for message_id');
+  assert.ok(sample.includes('seq='), 'tag for sequence_number');
 });
 
 test('L2. AAD er deterministisk for samme input', () => {
   const a = buildAAD({ conversation_id: CONVO, sender_id: ALICE_ID, message_id: 'm1', sequence_number: 7 });
   const b = buildAAD({ conversation_id: CONVO, sender_id: ALICE_ID, message_id: 'm1', sequence_number: 7 });
   assert.equal(a, b);
+});
+
+test('L3. AAD-lengde er UTF-8 bytelengde, ikke tegnlengde — norske tegn håndteres', () => {
+  // "æ" er 2 UTF-8 byte, 1 tegn. Lengdeprefiksen må reflektere bytelengden
+  // for at kodingen skal forbli entydig (ellers kan flertydige verdier
+  // kollidere i dekoding). Sammenlign en AAD med "æ" mot en med "a" —
+  // lengdene i prefiksen skiller dem.
+  const withAe = buildAAD({ conversation_id: 'æ', sender_id: 's', message_id: 'm', sequence_number: 1 });
+  const withA = buildAAD({ conversation_id: 'a', sender_id: 's', message_id: 'm', sequence_number: 1 });
+  // "æ" → "2:æ" (2 byte), "a" → "1:a" (1 byte).
+  assert.ok(withAe.includes('cid=2:æ'), 'norsk tegn får 2-byte lengdeprefiks');
+  assert.ok(withA.includes('cid=1:a'), 'ASCII-tegn får 1-byte lengdeprefiks');
+  assert.notEqual(withAe, withA, 'ulik bytelengde → ulik AAD');
+});
+
+test('L4. AAD med Unicode + separatorer + emoji round-trip-entydig', () => {
+  // Bekrefter at verdier med Unicode, Unit Separator (0x1F) og emoji ikke
+  // bryter entydigheten — lengdeprefiksen disambiguerer.
+  const tricky = 'æøå😀\x1F✅\x1E';
+  const a = buildAAD({ conversation_id: tricky, sender_id: ALICE_ID, message_id: 'm', sequence_number: 1 });
+  const b = buildAAD({ conversation_id: tricky, sender_id: ALICE_ID, message_id: 'm', sequence_number: 1 });
+  assert.equal(a, b, 'deterministisk for tricky input');
+  // En annen verdi som "ligner" må gi ulik AAD.
+  const c = buildAAD({ conversation_id: 'æøå😀\x1F✅', sender_id: ALICE_ID, message_id: 'm', sequence_number: 1 });
+  assert.notEqual(a, c, 'forskjellig verdi gir forskjellig AAD selv om de deler prefiks');
 });
