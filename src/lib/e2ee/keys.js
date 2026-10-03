@@ -8,12 +8,19 @@
 // VIKTIG: Den private X25519-nøkkelen forlater ALDRI klienten ukryptert.
 // `encryptPrivateKey` returnerer en base64-blob som trygt kan lagres på
 // serveren; `decryptPrivateKey` gjenoppretter den kun med riktig passord.
+//
+// REVIDERT FASE 1:
+//   `deriveSharedSecret` validerer nå motpartens offentlige nøkkel (32 byte)
+//   og avviser all-zero / low-order resultater (contributory behavior). Dette
+//   forhindrer at en ondsinnet motpart tvinger frem en forutsigbar (all-zero)
+//   delt hemmelighet via et lav-ordens punkt.
 
 import { x25519 } from '@noble/curves/ed25519';
-import { argon2id, argon2Verify } from 'hash-wasm';
+import { argon2id } from 'hash-wasm';
 import { importAesKey, exportRaw, encrypt, decrypt, bytesToBase64, base64ToBytes } from './crypto.js';
 
 const textEncoder = new TextEncoder();
+const KEY_BYTES = 32;
 
 // ---------------------------------------------------------------------------
 // X25519 identitetsnøkkel-par.
@@ -34,9 +41,37 @@ export function generateIdentityKeyPair() {
   };
 }
 
+// ---------------------------------------------------------------------------
+// ECDH med contributory-validering.
+//
+// Steg:
+//   1. Lengdesjekk: theirPublicKey må være nøyaktig 32 byte.
+//   2. Kjør X25519 getSharedSecret.
+//   3. Avvis all-zero resultat (indikerer lav-ordens / ugyldig punkt).
+// En all-zero delt hemmelighet ville gjort HKDF-nøkkelen forutsigbar; vi nekter
+// å produsere en sesjonsnøkkel i det tilfellet.
+//
+// Feilkode: 'INVALID_PUBLIC_KEY' (lengde) | 'LOW_ORDER_SHARED' (all-zero).
+// ---------------------------------------------------------------------------
+
 export function deriveSharedSecret(mySecretKey, theirPublicKey) {
-  const shared = x25519.getSharedSecret(toU8(mySecretKey), toU8(theirPublicKey));
-  return new Uint8Array(shared);
+  const pub = toU8(theirPublicKey);
+  if (pub.length !== KEY_BYTES) {
+    const e = new Error(`X25519 public key must be ${KEY_BYTES} bytes, got ${pub.length}`);
+    e.code = 'INVALID_PUBLIC_KEY';
+    throw e;
+  }
+  const shared = new Uint8Array(x25519.getSharedSecret(toU8(mySecretKey), pub));
+  let allZero = true;
+  for (let i = 0; i < shared.length; i++) {
+    if (shared[i] !== 0) { allZero = false; break; }
+  }
+  if (allZero) {
+    const e = new Error('Rejected low-order X25519 public key (all-zero shared secret)');
+    e.code = 'LOW_ORDER_SHARED';
+    throw e;
+  }
+  return shared;
 }
 
 // ---------------------------------------------------------------------------

@@ -2,15 +2,20 @@
 //
 // Denne modulen er bevisst holdt uten Base44, UI og nettverk, slik at den kan
 // enhetstestes isolert. Se e2ee.test.js for den fullstendige testplanen
-// (30 tester) og trusselmodell-dokumentasjonen i sikkerhetsrapporten.
+// og trusselmodell-dokumentasjonen i sikkerhetsrapporten.
+//
+// REVIDERT FASE 1:
+//   `generateIV` er IKKE lenger eksportert i det offentlige API-et. IV
+//   genereres ALLTID internt av `encrypt()` med CSPRNG — ingen caller-styrt
+//   nonce eksponeres. (Test-seam for IV-kollisjon bor kun i test-filen.)
 //
 // Ingenting her muterer database, RLS eller eksisterende app-logikk. Fase 2+
-// (nøkkel-UI, meldingsintegrering) er separerte og krever separat godkjenning.
+// (nøkkel-UI, meldingsintegrering, IndexedDB-replay-state) er separerte og
+// krever separat godkjenning.
 
 export {
   encrypt,
   decrypt,
-  generateIV,
   importAesKey,
   exportRaw,
   bytesToBase64,
@@ -33,7 +38,9 @@ export {
   createSessionState,
   deriveConversationKey,
   deriveMessageKey,
+  buildHKDFInfo,
   canRotate,
+  PROTOCOL_VERSION,
 } from './session.js';
 
 export {

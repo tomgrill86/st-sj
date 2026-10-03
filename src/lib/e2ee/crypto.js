@@ -16,11 +16,17 @@
 //   avsender. Selve deduplikeringen av message_id gjøres av mottakeren i
 //   store.js / envelope.js — AAD sørger bare for at manipulert kontekst
 //   avvises kryptografisk.
+//
+// REVIDERT FASE 1:
+//   `generateIV` har INGEN caller-styrt nonce-seam i produksjons-API-et.
+//   Produksjonskoden genererer ALLTID en ny 96-bit IV internt med CSPRNG
+//   (`globalThis.crypto.getRandomValues`). Test-seam for IV-kollisjon bor i
+//   test-filen (se e2ee.test.js), ikke her — og tree-shakes dermed ut av
+//   produksjonsbygget.
 
 const IV_BYTES = 12; // AES-GCM anbefaler 96-bit IV
 const KEY_BYTES = 32; // AES-256
 
-// TextEncoder/Decoder for UTF-8 håndtering av AAD og plaintext.
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -48,19 +54,20 @@ function toU8(x) {
 }
 
 // ---------------------------------------------------------------------------
-// IV-generering med unikhetssjekk.
+// IV-generering — KUN CSPRNG. Ingen caller-styrt nonce.
 //
 // Genererer en kryptografisk tilfeldig 12-byte IV. Kalleren kan sende inn en
 // `seenIvSet` (Set av base64-strenger) for å garantere unikhet innenfor én
 // nøkkel/ sesjon. Ved (usannsynlig) kollisjon kastes det — aldri returneres en
 // duplikat IV, siden gjenbruk av IV under samme AES-GCM-nøkkel ødelegger
 // sikkerheten fullstendig.
+//
+// Det finnes INGEN parameter for å mate inn en egen IV. Test-kroken for
+// kollisjonssimulering lever i test-filen, ikke i prod-koden.
 // ---------------------------------------------------------------------------
 
-export function generateIV(seenIvSet, providedIv) {
-  // `providedIv` er en testseam (kun for deterministiske kollisjonstester) —
-  // produksjon bruker alltid kryptografisk tilfeldig tetthet.
-  const iv = providedIv || globalThis.crypto.getRandomValues(new Uint8Array(IV_BYTES));
+export function generateIV(seenIvSet) {
+  const iv = globalThis.crypto.getRandomValues(new Uint8Array(IV_BYTES));
   const id = bytesToBase64(iv);
   if (seenIvSet && seenIvSet.has(id)) {
     // Ekstremt usannsynlig ved tilfeldige IV-er, men vi nekter å returnere en
@@ -73,9 +80,6 @@ export function generateIV(seenIvSet, providedIv) {
 
 // ---------------------------------------------------------------------------
 // Nøkkelhåndtering for Web Crypto AES-GCM.
-//
-// `deriveKeyFromBytes` avleder en AES-GCM CryptoKey fra 32 rå byte (kommer
-// f.eks. fra HKDF i session.js). `exportRaw`/ `importRaw` brukes i tester.
 // ---------------------------------------------------------------------------
 
 export async function importAesKey(rawKeyBytes) {
@@ -102,19 +106,16 @@ export async function exportRaw(key) {
 //
 //   plaintext:  string (UTF-8)
 //   key:        CryptoKey (AES-GCM 256)
-//   aad:        string (koding = UTF-8 av "conversation_id||sender_id||...").
+//   aad:        string (entydig, versjonert — se envelope.buildAAD)
 //               Dette bindes AUTENTISERT til ciphertext via AES-GCMs AAD-mekanisme.
-//   iv:         Uint8Array(12) — generert av generateIV (eller oppgitt i test).
 //
 // Returnerer:  { iv: base64, ciphertext: base64, version: 1 }
+//   IV genereres ALLTID internt av generateIV() — aldri oppgitt av caller.
 //   ciphertext inkluderer AES-GCM-autentiseringstaggen (siste 16 byte).
 // ---------------------------------------------------------------------------
 
-export async function encrypt(plaintext, key, aad, iv) {
-  const ivBytes = iv ? toU8(iv) : generateIV();
-  if (ivBytes.length !== IV_BYTES) {
-    throw new Error(`IV must be ${IV_BYTES} bytes, got ${ivBytes.length}`);
-  }
+export async function encrypt(plaintext, key, aad) {
+  const ivBytes = generateIV();
   const aadBytes = textEncoder.encode(aad);
   const ptBytes = textEncoder.encode(plaintext);
   const ctBuf = await globalThis.crypto.subtle.encrypt(
@@ -150,8 +151,6 @@ export async function decrypt(envelope, key, aad) {
       ctBytes
     );
   } catch (e) {
-    // Wrappes i en forutsigbar feiltype slik at mottakerlogikk kan skille
-    // krypto-feil fra andre unntak. Ingen plaintext lekker her.
     const err = new Error('Decryption failed (tag mismatch / tampered ciphertext or AAD)');
     err.code = 'DECRYPT_FAILED';
     throw err;

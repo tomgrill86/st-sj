@@ -8,32 +8,61 @@
 //   - ratchet_header:  reservert for fase 5 (Double Ratchet) — tom i MVP
 //   - iv, ciphertext, version: fra crypto.encrypt
 //
-// AAD (Additional Authenticated Data) settes sammen deterministisk:
-//   `${conversation_id}||${sender_id}||${message_id}||${sequence_number}`
+// REVIDERT FASE 1 — AAD er nå ENTYDIG og VERSJONERT:
+//   Tidligere: `${conversation_id}||${sender_id}||${message_id}||${sequence_number}`
+//   (sårbar for kollisjon dersom et felt inneholdt "|").
+//
+//   Nå: et versjonert, lengde-prefiksert format. Hvert felt kodes som
+//   `<varint-lengde>:<utf8-verdi>` der lengden er feltets byte-lengde som
+//   desimal-streng, etterfulgt av ':' og verdi-byte. Feltene skilles med
+//   ASCII 0x1F (Unit Separator). En 1-byte versjonstegn-prefiks ("v1\x1F")
+//   gjør formatet fremtidig-kompatibelt.
+//
+//   Dette er kollisjonsfritt: lengde-prefiksen gjør at verdi-med-skilletegn
+//   aldri kan tolkes som to felt. (Se test av entydig koding.)
 //
 // AES-GCM autentiserer AAD. Dette betyr:
-//   - Endres message_id i AAD → tag mismatch → avvis (test 11).
-//   - En ciphertext kan ikke "flyttes" til en annen message_id (test 13).
-//   - Endres conversation_id eller sender_id → avvis (test 8, 9).
+//   - Endres message_id i AAD → tag mismatch → avvis.
+//   - En ciphertext kan ikke "flyttes" til en annen message_id (test).
+//   - Endres conversation_id eller sender_id → avvis.
 //
 // REPLAY-BESKYTTELSE:
 //   AES-GCM + AAD forhindrer manipulasjon, men ikke replay av en tidligere
-//   gyldig kuvert. `verifyAndAccept` sjekker derfor message_id mot et
-//   dedup-sett (forvaltet av store.js) og avviser allerede behandlede
-//   meldinger. Dette gjøres klient-side hos mottakeren — serveren kan ikke
-//   se message_id-semantikk uten innholdsanalyse (forbudt i trusselmodellen).
+//   gyldig kuvert. `openMessage` sjekker derfor message_id mot et dedup-sett
+//   (forvaltet av store.js) og avviser allerede behandlede meldinger. Dette
+//   gjøres klient-side hos mottakeren.
+//
+//   PERSISTENS: I Fase 1 er dedup-settet in-memory (createInMemoryStore).
+//   IndexedDB-basert persistering som overlever reload/ny fane kommer i
+//   Fase 2 og MÅ være på plass før modulen kobles til ekte meldinger.
 
-import { encrypt, decrypt, generateIV, bytesToBase64, base64ToBytes } from './crypto.js';
+import { encrypt, decrypt, bytesToBase64, base64ToBytes } from './crypto.js';
 
+const AAD_VERSION = 'v1';
+const SEP = '\x1F'; // ASCII Unit Separator — kan ikke opptre i base64/ID-er
 const textEncoder = new TextEncoder();
 
 // ---------------------------------------------------------------------------
-// Bygg AAD-streng deterministisk. Rekkefølgen er kontrakt — mottakeren må
-// bruke nøyaktig samme streng ved dekryptering, ellers feiler taggen.
+// Bygg AAD ENTYDIG og VERSJONERT. Lengde-prefiks per felt = kollisjonsfritt.
+//
+// Format: "v1" + SEP + ("len:val" + SEP)*4  (kunne også binær, men streng er
+// lesbart for debugging). Lengden er UTF-8 byte-lengde av verdien.
 // ---------------------------------------------------------------------------
 
 export function buildAAD({ conversation_id, sender_id, message_id, sequence_number }) {
-  return `${conversation_id}||${sender_id}||${message_id}||${sequence_number}`;
+  const seqStr = String(sequence_number);
+  const fields = [
+    field(conversation_id),
+    field(sender_id),
+    field(message_id),
+    field(seqStr),
+  ];
+  return AAD_VERSION + SEP + fields.join(SEP);
+}
+
+function field(value) {
+  const byteLen = textEncoder.encode(value).length;
+  return `${byteLen}:${value}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -41,9 +70,10 @@ export function buildAAD({ conversation_id, sender_id, message_id, sequence_numb
 //
 // Input:
 //   { conversation_id, sender_id, sequence_number, plaintext, key,
-//     seenIvSet? }
+//     message_id?, seenIvSet? }
 //
 // `message_id` genereres med crypto.randomUUID hvis ikke oppgitt (testbar).
+// IV genereres ALLTID internt av crypto.encrypt (CSPRNG, ingen caller-seam).
 // ---------------------------------------------------------------------------
 
 export async function sealMessage({ conversation_id, sender_id, sequence_number, plaintext, key, message_id, seenIvSet }) {
@@ -52,7 +82,7 @@ export async function sealMessage({ conversation_id, sender_id, sequence_number,
   if (sequence_number == null) throw new Error('sequence_number required');
   const mid = message_id || newMessageId();
   const aad = buildAAD({ conversation_id, sender_id, message_id: mid, sequence_number });
-  const enc = await encrypt(plaintext, key, aad, generateIV(seenIvSet));
+  const enc = await encrypt(plaintext, key, aad);
   return {
     message_id: mid,
     sequence_number,
@@ -68,18 +98,14 @@ export async function sealMessage({ conversation_id, sender_id, sequence_number,
 // ---------------------------------------------------------------------------
 // Åpne en kuvert: verifiser kontekst, dekrypter, og dedup-sjekk.
 //
-// Input:
-//   envelope, expectedConversationId, expectedSenderId, key, seenMessageIds (Set)
-//
 // Steg:
 //   1. Kontekst-sjekk: conversation_id/ sender_id i kuverten må matche
-//      forventet. (Test 15, 16.)
+//      forventet.
 //   2. AAD bygges og dekryptering kjøres. Manipulert AAD eller ciphertext
-//      → tag mismatch → avvis. (Test 5–11.)
-//   3. Dedup: message_id må ikke være i seenMessageIds. (Test 12, 13, 14.)
-//      Ved første aksept legges message_id til i settet av calleren.
+//      → tag mismatch → avvis.
+//   3. Dedup: message_id må ikke være i seenMessageIds. Ved første aksept
+//      legges message_id til i settet av calleren.
 //
-// Returnerer: { plaintext, message_id, sequence_number, replay: false }
 // Kaster ved avvisning med `.code`-felt:
 //   'WRONG_CONVERSATION', 'WRONG_SENDER', 'DECRYPT_FAILED', 'REPLAY'
 // ---------------------------------------------------------------------------
@@ -126,4 +152,5 @@ export function newMessageId() {
 }
 
 // Re-eksporter primitiver som tester/ fremtidig kode trenger.
-export { generateIV, bytesToBase64, base64ToBytes };
+// Merk: generateIV er IKKE lenger eksportert herfra — se crypto.js/index.js.
+export { bytesToBase64, base64ToBytes };

@@ -10,6 +10,17 @@
 // brukeren. Fase 5 (Double Ratchet) vil rotere per-meldings nøkler uten at
 // denne modulens signatur endres.
 //
+// REVIDERT FASE 1 — HKDF-kontekst binding:
+//   HKDF-info binder nå KANONISK:
+//     - protokollversjon ("stæsj:e2ee:v1")
+//     - formål ("message-key")
+//     - conversationId
+//     - BEGGE offentlige nøkler (sortert base64) — hindrer at samme ECDH-
+//       utbytte gjenbrukes på tvers av identiteter/rotasjoner
+//     - BEGGE bruker-ID-er (sortert) — binder nøkkelen til deltakerne
+//   Kanonisk sortering (lo/hi etter base64) garanterer at begge parter avleder
+//   identisk info uavhengig av hvem som initierer.
+//
 // Arkitektonisk forberedelse for rotasjon:
 //   `deriveMessageKey(sessionState)` returnerer i MVP den statiske
 //   samtalenøkkelen. Signaturen er stabil, slik at en fremtidig ratchet
@@ -18,19 +29,24 @@
 //   reserverte felt (chainKey, messageNumber) som MVP ikke bruker, men som
 //   fase 5 kan slå på.
 
-import { deriveSharedSecret } from './keys.js';
+import { deriveSharedSecret, publicKeyToBase64 } from './keys.js';
 import { importAesKey } from './crypto.js';
 
-const HKDF_INFO = new TextEncoder().encode('stæsj:e2ee:v1:message-key');
+const PROTOCOL_VERSION = 'stæsj:e2ee:v1';
+const HKDF_PURPOSE = 'message-key';
 const HKDF_SALT = new Uint8Array(0); // tom salt; ECDH-utbyttet er allerede high-entropy
+const textEncoder = new TextEncoder();
 
 // ---------------------------------------------------------------------------
 // Opprett sesjonstilstand for en samtale.
 //
 // Input:
-//   mySecretKey:  Uint8Array(32) — min private X25519-nøkkel
-//   theirPublicKey: Uint8Array(32) — motpartens offentlige X25519-nøkkel
-//   conversationId: string — bindes inn i HKDF-info for samtale-isolasjon
+//   mySecretKey:   Uint8Array(32) — min private X25519-nøkkel
+//   myPublicKey:   Uint8Array(32) — min offentlige X25519-nøkkel (for HKDF-info)
+//   theirPublicKey:Uint8Array(32) — motpartens offentlige X25519-nøkkel
+//   conversationId:string — bindes inn i HKDF-info for samtale-isolasjon
+//   myUserId:      string — min bruker-ID (for HKDF-info)
+//   theirUserId:   string — motpartens bruker-ID (for HKDF-info)
 //
 // Returnerer:
 //   { conversationId, conversationKey: CryptoKey, chainKey: null,
@@ -41,10 +57,21 @@ const HKDF_SALT = new Uint8Array(0); // tom salt; ECDH-utbyttet er allerede high
 // fremtidig rotasjonskode kan slås på uten omskriving.
 // ---------------------------------------------------------------------------
 
-export async function createSessionState({ mySecretKey, theirPublicKey, conversationId }) {
+export async function createSessionState({ mySecretKey, myPublicKey, theirPublicKey, conversationId, myUserId, theirUserId }) {
   if (!conversationId) throw new Error('conversationId is required');
+  if (!myUserId) throw new Error('myUserId is required');
+  if (!theirUserId) throw new Error('theirUserId is required');
+  if (!(myPublicKey instanceof Uint8Array) || myPublicKey.length !== 32) {
+    throw new Error('myPublicKey must be Uint8Array(32)');
+  }
   const shared = deriveSharedSecret(mySecretKey, theirPublicKey);
-  const conversationKey = await deriveConversationKey(shared, conversationId);
+  const conversationKey = await deriveConversationKey(shared, {
+    conversationId,
+    myPublicKey,
+    theirPublicKey,
+    myUserId,
+    theirUserId,
+  });
   return {
     conversationId,
     conversationKey,
@@ -55,16 +82,18 @@ export async function createSessionState({ mySecretKey, theirPublicKey, conversa
 }
 
 // ---------------------------------------------------------------------------
-// Avled AES-256-nøkkel fra rå ECDH-hemmelighet + conversationId via HKDF-SHA256.
+// Avled AES-256-nøkkel fra rå ECDH-hemmelighet + kanonisk kontekst via
+// HKDF-SHA256.
 //
-// conversationId inngår i HKDF-info for at to parter som har flere samtaler
-// ikke skal gjenbruke nøyaktig samme nøkkel på tvers av dem.
+// HKDF-info bygges ENTYDIG og KANONISK (se buildHKDFInfo):
+//   protokollversjon ‖ formål ‖ conversationId ‖ pubKey_lo ‖ pubKey_hi ‖ userId_lo ‖ userId_hi
+// hvor lo/hi er sortert slik at begge parter avleder likt uavhengig av retning.
 // ---------------------------------------------------------------------------
 
-export async function deriveConversationKey(sharedSecret, conversationId) {
+export async function deriveConversationKey(sharedSecret, ctx) {
   const ikm = sharedSecret instanceof Uint8Array ? sharedSecret : new Uint8Array(sharedSecret);
   const baseKey = await globalThis.crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveKey']);
-  const info = new TextEncoder().encode(`${conversationId}||${new TextDecoder().decode(HKDF_INFO)}`);
+  const info = buildHKDFInfo(ctx);
   return globalThis.crypto.subtle.deriveKey(
     { name: 'HKDF', hash: 'SHA-256', salt: HKDF_SALT, info },
     baseKey,
@@ -75,19 +104,39 @@ export async function deriveConversationKey(sharedSecret, conversationId) {
 }
 
 // ---------------------------------------------------------------------------
-// deriveMessageKey — stabil signatur, MVP returnerer samtalenøkkelen.
+// Bygg kanonisk, entydig HKDF-info-streng.
 //
-// I MVP: returnerer `sessionState.conversationKey` uendret for hver melding.
-// I fase 5: vil ratchet chainKey → messageKey og inkrementere messageNumber,
-// slik at hver melding får en unik nøkkel (forward secrecy) uten at
-// mottakeren eller envelope.js må endres.
+// Feltene skilles med ASCII 0x1F (Unit Separator) — et tegn som ikke kan
+// opptre i base64 eller vanlige ID-strenger — og protokollversjonen står
+// først. Begge public keys og begge user-ID-er sorteres kanonisk (lo/hi),
+// slik at Alice→Bob og Bob→Alice produserer identisk info → identisk nøkkel.
+// ---------------------------------------------------------------------------
+
+export function buildHKDFInfo({ conversationId, myPublicKey, theirPublicKey, myUserId, theirUserId }) {
+  const pubLo = publicKeyToBase64(myPublicKey) < publicKeyToBase64(theirPublicKey)
+    ? myPublicKey : theirPublicKey;
+  const pubHi = pubLo === myPublicKey ? theirPublicKey : myPublicKey;
+  const [userLo, userHi] = [myUserId, theirUserId].sort();
+  const parts = [
+    PROTOCOL_VERSION,
+    HKDF_PURPOSE,
+    conversationId,
+    publicKeyToBase64(pubLo),
+    publicKeyToBase64(pubHi),
+    userLo,
+    userHi,
+  ];
+  return textEncoder.encode(parts.join('\x1F'));
+}
+
+// ---------------------------------------------------------------------------
+// deriveMessageKey — stabil signatur, MVP returnerer samtalenøkkelen.
 // ---------------------------------------------------------------------------
 
 export async function deriveMessageKey(sessionState) {
   if (!sessionState?.conversationKey) {
     throw new Error('Invalid session state: missing conversationKey');
   }
-  // MVP: samme nøkkel for alle meldinger. Se filhodet for caveats.
   return sessionState.conversationKey;
 }
 
@@ -101,4 +150,4 @@ export function canRotate(sessionState) {
 }
 
 // Re-eksporter for tester som trenger å inspisere den rå nøkkelen.
-export { importAesKey };
+export { importAesKey, PROTOCOL_VERSION };
