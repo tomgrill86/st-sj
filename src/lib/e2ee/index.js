@@ -51,3 +51,4 @@ export {
 } from './envelope.js';
 
 export { createInMemoryStore } from './store.js';
+export { createIndexedDbStore } from './indexed-db-store.js';
