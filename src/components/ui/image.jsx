@@ -115,21 +115,8 @@ ResponsiveImage.displayName = "ResponsiveImage"
  * as a plain <img>. Failed transforms retry the original URL; only a broken
  * original swaps to the generic fallback image.
  */
-const Image = React.forwardRef(
-  (/** @param {React.ImgHTMLAttributes<HTMLImageElement> & { fittingType?: string; originWidth?: number; originHeight?: number; focalPointX?: number; focalPointY?: number; quality?: number }} props @param {React.ForwardedRef<HTMLImageElement>} ref */
-    {
-      src,
-      fittingType = "fill",
-      originWidth,
-      originHeight,
-      focalPointX,
-      focalPointY,
-      quality = 90,
-      onError,
-      ...props
-    },
-    ref
-  ) => {
+const Image = React.forwardRef(/** @type {React.ForwardRefRenderFunction<HTMLImageElement, React.ImgHTMLAttributes<HTMLImageElement> & { fittingType?: string; originWidth?: number; originHeight?: number; focalPointX?: number; focalPointY?: number; quality?: number }>} */ ((props, ref) => {
+    const { src, fittingType = "fill", originWidth, originHeight, focalPointX, focalPointY, quality = 90, onError, ...imageRest } = props;
     const parsedSource = src && src !== FALLBACK_IMAGE_URL ? parseWixMediaUrl(src) : null
     const initialMode = parsedSource ? IMAGE_LOAD_MODE.OPTIMIZED : IMAGE_LOAD_MODE.ORIGINAL
     const [loadState, setLoadState] = React.useState({ src, mode: initialMode })
@@ -147,7 +134,7 @@ const Image = React.forwardRef(
     }
 
     const imageProps = {
-      ...props,
+      ...imageRest,
       onError: handleError,
     }
 
@@ -192,7 +179,7 @@ const Image = React.forwardRef(
       />
     )
   }
-)
+))
 Image.displayName = "Image"
 
 export { Image }
