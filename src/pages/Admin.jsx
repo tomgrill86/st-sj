@@ -266,7 +266,7 @@ function CategoriesTab() {
               </select>
             </div>
             <div><label className="mb-1.5 block text-sm font-medium">Icon (optional)</label><input value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} placeholder="lucide icon name" className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:border-ring" /></div>
-            <div><label className="mb-1.5 block text-sm font-medium">Sort order</label><input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) }) className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:border-ring" /></div>
+            <div><label className="mb-1.5 block text-sm font-medium">Sort order</label><input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:border-ring" /></div>
             <div className="flex items-end"><label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />Active</label></div>
             <div className="sm:col-span-2"><label className="mb-1.5 block text-sm font-medium">Description</label><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:border-ring" /></div>
           </div>
