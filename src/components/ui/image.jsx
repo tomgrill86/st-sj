@@ -116,7 +116,7 @@ ResponsiveImage.displayName = "ResponsiveImage"
  * original swaps to the generic fallback image.
  */
 const Image = React.forwardRef(
-  (
+  (/** @param {React.ImgHTMLAttributes<HTMLImageElement> & { fittingType?: string; originWidth?: number; originHeight?: number; focalPointX?: number; focalPointY?: number; quality?: number }} props @param {React.ForwardedRef<HTMLImageElement>} ref */
     {
       src,
       fittingType = "fill",
