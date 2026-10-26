@@ -19,6 +19,8 @@ const RESPONSE_SCHEMA = {
   required: ['title', 'description', 'listing_type', 'condition', 'suggested_price', 'price_reasoning'],
 };
 
+/** @typedef {{ title: string; description: string; listing_type: 'good' | 'service'; condition: string; suggested_price: number; price_reasoning: string }} ListingDraft */
+
 const SUGGESTIONS = [
   'Bruk iPhone 13 Pro 256GB, god stand',
   'Sykkelverksted – hjul og gir-justering',
@@ -31,7 +33,7 @@ export default function ListingAssistant({ form, onApply }) {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [draft, setDraft] = useState(null);
+  const [draft, setDraft] = useState(/** @type {ListingDraft | null} */ (null));
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -51,8 +53,14 @@ export default function ListingAssistant({ form, onApply }) {
         prompt: `${context}\n\nBrukeren sier: "${prompt}"\n\nLag et komplett annonseutkast for markedsplassen. Skriv tittel og beskrivelse på norsk. Velg listing_type (good/service) og condition. Sett en realistisk og konkurransedyktig anbefalt pris (${form.currency || 'USD'}) med kort forklaring.`,
         response_json_schema: RESPONSE_SCHEMA,
       });
-      setDraft(res);
-      setMessages((m) => [...m, { role: 'assistant', content: `Forslag klart! Tittel: «${res.title}». Prisforslag: ${Number(res.suggested_price).toLocaleString()} ${form.currency || 'USD'}. Se kortet under for å bruke det i annonsen.` }]);
+      const result = typeof res === 'string' ? JSON.parse(res) : res;
+      if (!result || typeof result !== 'object' || typeof result.title !== 'string' || typeof result.suggested_price !== 'number') {
+        throw new Error('AI returned an invalid listing draft');
+      }
+      /** @type {ListingDraft} */
+      const listingDraft = result;
+      setDraft(listingDraft);
+      setMessages((m) => [...m, { role: 'assistant', content: `Forslag klart! Tittel: «${listingDraft.title}». Prisforslag: ${Number(listingDraft.suggested_price).toLocaleString()} ${form.currency || 'USD'}. Se kortet under for å bruke det i annonsen.` }]);
     } catch (e) {
       setMessages((m) => [...m, { role: 'assistant', content: 'Beklager, noe gikk galt. Prøv igjen.' }]);
     } finally {
