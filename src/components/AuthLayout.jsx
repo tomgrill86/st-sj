@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Wordmark } from "@/components/brand/Logo";
 
+/** @param {{ icon: React.ElementType; title: string; subtitle?: string; footer?: React.ReactNode; children?: React.ReactNode }} props */
 export default function AuthLayout({ icon: Icon, title, subtitle, footer, children }) {
   return (
     <div className="min-h-screen flex flex-col bg-background px-4">
