@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { useMemo, useState, useEffect } from 'react';
-import { SlidersHorizontal, Package, X } from 'lucide-react';
+import { SlidersHorizontal, Package } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import ListingCard from '@/components/marketplace/ListingCard';
 import EmptyState from '@/components/marketplace/EmptyState';
@@ -28,7 +28,7 @@ export default function Browse() {
     const next = {};
     Object.entries(filters).forEach(([k, v]) => { if (v) next[k] = v; });
     setParams(next, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [filters]);
 
   const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: fetchCategories });

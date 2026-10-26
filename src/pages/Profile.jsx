@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { MapPin, Calendar, Star, ShoppingBag, Camera, Save } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { MapPin, Camera, Save } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import StarRating from '@/components/marketplace/StarRating';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { formatDate, userDisplayName, userLocation } from '@/lib/marketplace';
+import { userDisplayName, userLocation } from '@/lib/marketplace';
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'INR', 'BRL', 'ZAR', 'NGN', 'AED'];
 

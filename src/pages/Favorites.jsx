@@ -4,9 +4,8 @@ import { Heart, Trash2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import EmptyState from '@/components/marketplace/EmptyState';
-import { Button } from '@/components/ui/button';
 import { Image } from '@/components/ui/image';
-import { formatPrice, CONDITION_LABELS } from '@/lib/marketplace';
+import { formatPrice } from '@/lib/marketplace';
 
 export default function Favorites() {
   const { user } = useAuth();

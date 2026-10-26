@@ -2,7 +2,6 @@ import { UploadCloud, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Image } from '@/components/ui/image';
-import { Button } from '@/components/ui/button';
 
 // Uploads images via Base44 file storage and returns public URLs.
 export default function ImageUploader({ images = [], onChange, max = 8 }) {
