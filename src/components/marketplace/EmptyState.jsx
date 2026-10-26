@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
+/** @param {{ icon?: React.ElementType; title: string; description?: string; actionLabel?: string; actionTo?: string }} props */
 export default function EmptyState({ icon: Icon, title, description, actionLabel, actionTo }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/20 px-6 py-16 text-center">
