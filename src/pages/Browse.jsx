@@ -25,6 +25,7 @@ export default function Browse() {
 
   // Sync URL params <-> filters
   useEffect(() => {
+    /** @type {Record<string, string>} */
     const next = {};
     Object.entries(filters).forEach(([k, v]) => { if (v) next[k] = v; });
     setParams(next, { replace: true });
@@ -65,7 +66,7 @@ export default function Browse() {
     switch (filters.sort) {
       case 'price_asc': result.sort((a, b) => Number(a.price) - Number(b.price)); break;
       case 'price_desc': result.sort((a, b) => Number(b.price) - Number(a.price)); break;
-      default: result.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+      default: result.sort((a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime());
     }
     return result;
   }, [listings, filters, categoryObj]);
